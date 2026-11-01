@@ -1,5 +1,5 @@
-// Change this version with every release: it is what makes installed apps offer the update.
-const CACHE = 'mbm-invoice-v0.8.0';
+// Change this version with every release: it is what makes installed apps update.
+const CACHE = 'mbm-invoice-v0.8.1';
 const FILES = [
   './',
   'index.html',
@@ -14,7 +14,8 @@ const FILES = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(FILES)));
+  // Skip the browser's HTTP cache, or an update could store the previous version's files.
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(FILES.map((file) => new Request(file, { cache: 'reload' })))));
 });
 
 self.addEventListener('activate', (event) => {

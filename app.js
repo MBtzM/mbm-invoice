@@ -10,7 +10,7 @@
     document.head.appendChild(csp);
   }
 
-  const APP_VERSION = '0.8';
+  const APP_VERSION = '0.8.1';
   const STORAGE_KEY = 'mbm_invoice_v1_state';
   // The Android build fills this in so its older versions keep their saved data.
   const LEGACY_STORAGE_KEY = null;
@@ -30,6 +30,7 @@
   let currentTab = 'home';
   let editingInvoiceId = null;
   let installPrompt = null;
+  let waitingWorker = null;
 
   function uid() {
     return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -215,6 +216,7 @@
     if (tab === 'home') renderHome();
     if (tab === 'history') renderHistory();
     if (tab === 'settings') renderSettings();
+    applyUpdateIfIdle();
   }
 
   // ---------- Device helpers ----------
@@ -411,7 +413,8 @@
         <div class="kicker">Acerca de</div>
         <h3 style="margin-top:6px">MBM Invoice</h3>
         <p class="settings-note" style="margin-top:6px">Versión ${APP_VERSION} · Creado por Mauricio Benitez</p>
-        <p class="settings-note" style="margin-top:6px">Gratis. Sin cuentas ni anuncios. Tus datos no salen del dispositivo salvo que tú exportes o compartas un archivo. Disponible en kynari.dev.</p>
+        <a class="brand-link" href="https://kynari.dev/" target="_blank" rel="noopener">by Kynari</a>
+        <p class="settings-note">Gratis. Sin cuentas ni anuncios. Tus datos no salen del dispositivo salvo que tú exportes o compartas un archivo.</p>
       </section>
       <button class="danger" data-action="erase-all">Borrar todos mis datos</button>`;
   }
@@ -636,6 +639,7 @@
     modalBackdrop.classList.add('hidden');
     modalBackdrop.setAttribute('aria-hidden', 'true');
     modal.innerHTML = '';
+    applyUpdateIfIdle();
   }
 
   let toastTimer;
@@ -1415,40 +1419,40 @@
     if (currentTab === 'home' && !$('#modalBackdrop:not(.hidden)')) renderHome();
   });
 
-  function showUpdateBar(worker) {
-    if ($('#updateBar')) return;
-    const bar = document.createElement('div');
-    bar.id = 'updateBar';
-    bar.className = 'update-bar';
-    bar.innerHTML = '<span>Hay una versión nueva.</span><button class="ghost">Actualizar</button>';
-    bar.querySelector('button').onclick = () => {
-      updateRequested = true;
-      worker.postMessage('skipWaiting');
-    };
-    document.body.appendChild(bar);
+  // A new version applies by itself, but never while someone is filling in a form:
+  // the reload would lose what they typed. Saved invoices are not affected.
+  function applyUpdateIfIdle() {
+    if (!waitingWorker) return;
+    const browsing = (currentTab === 'home' || currentTab === 'history') && modalBackdrop.classList.contains('hidden');
+    if (document.visibilityState !== 'hidden' && !browsing) return;
+    waitingWorker.postMessage('skipWaiting');
+    waitingWorker = null;
   }
 
-  let updateRequested = false;
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator) || !location.protocol.startsWith('http')) return;
+    const wasControlled = !!navigator.serviceWorker.controller;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (updateRequested) location.reload();
+      if (wasControlled) location.reload();
     });
     navigator.serviceWorker.register('sw.js').then((reg) => {
-      const offer = (worker) => {
-        if (worker && navigator.serviceWorker.controller) showUpdateBar(worker);
+      const updateReady = (worker) => {
+        if (!worker || !navigator.serviceWorker.controller) return;
+        waitingWorker = worker;
+        applyUpdateIfIdle();
       };
-      offer(reg.waiting);
+      updateReady(reg.waiting);
       reg.addEventListener('updatefound', () => {
         const worker = reg.installing;
         if (!worker) return;
         worker.addEventListener('statechange', () => {
-          if (worker.state === 'installed') offer(worker);
+          if (worker.state === 'installed') updateReady(worker);
         });
       });
       // An installed app can stay open for days, so look for updates each time it comes back.
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') reg.update().catch(()=>{});
+        applyUpdateIfIdle();
       });
     }).catch(()=>{});
     // Ask the browser not to clear these invoices when it needs space.

@@ -114,7 +114,6 @@ select.input{background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
 .toast{max-width:calc(100% - 32px);width:max-content;text-align:center;border-radius:18px}
 .hint-card{display:flex;flex-direction:column;gap:8px}
 .hint-actions{display:flex;flex-direction:column;gap:8px}
-.update-bar{position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);width:min(calc(100% - 24px),560px);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 8px 6px 16px;background:#1e1e20;color:#fff;border-radius:16px;font-size:14px;font-weight:650;z-index:60;box-shadow:0 10px 26px rgba(0,0,0,.2)}
-.update-bar .ghost{color:#6cb6ff}
+.brand-link{display:inline-block;padding:10px 0;font-size:15px;font-weight:700;color:var(--accent);text-decoration:none}
 .work-row{color:var(--text);grid-template-columns:52px minmax(0,1fr) auto}
 .quick-card,.history-card{color:var(--text)}
